@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Importaciones Estadounidenses</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            background: #f4f4f4;
+            height: 100vh;
+        }
+        .container {
+            background: #ffffff;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+            width: 80%;
+            max-width: 680px;
+            height: 600px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .header {
+            background: #E7E7ED;
+            padding: 10px 15px;
+            border-top-left-radius: 10px;
+            border-top-right-radius: 10px;
+            box-sizing: border-box;
+        }
+        .title-main {
+            font-size: 18px;
+            font-weight: bold;
+            margin: 0;
+			color:#444444;
+			font-family: Segoe UI;
+        }
+        .title-sub {
+            font-size: 11px;
+            margin: 1px 0 0 0;
+            color: #444444;
+			font-family: Segoe UI;
+        }
+        .summary {
+            display: flex;
+            justify-content: space-around;
+            margin: 3px 0;
+            font-family: Segoe UI, sans-serif;
+        }
+        .summary-item {
+            text-align: center;
+        }
+        .summary-country {
+            font-size: 12px;
+            font-weight: bold;
+			color: #555;
+            margin: 1px 0;
+
+        }
+        .summary-value {
+            font-size: 30px;
+            background: linear-gradient(to bottom,#C5C5C5,#000);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: bold;
+			font-family: Segoe UI;
+			margin: 0px 0;
+        }
+        svg {
+            display: block;
+            margin: auto;
+            width: 100%;
+            height: calc(100% - 160px);
+			
+        }
+        .footer {
+            background: #C4C6C8;
+            padding: 5px 10px;
+            font-size: 11px;
+            color: #3F4143;
+            text-align: right;
+            border-bottom-left-radius: 10px;
+            border-bottom-right-radius: 10px;
+            box-sizing: border-box;
+        }
+        .label {
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            text-anchor: middle;
+            font-size: 11px;
+            fill: #4B4B4B;
+        }
+        .value {
+            font-size: 12px;
+        }
+        .background {
+            fill: #E9E9E9;
+            fill-opacity: 0.5;
+            rx: 5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title-main">Importaciones de EE.UU - participación por mercado (en Tn y %)</h1>
+            <h2 class="title-sub">HS: 080450 - Guayabas, mangos y mangostanes, frescos o secos</h2>
+            <h3 class="title-sub">Enero - Septiembre 2024</h3>
+        </div>
+        <div class="summary">
+            <div class="summary-item">
+                <div class="summary-country">México</div>
+                <div class="summary-value">82.37%</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-country">Perú</div>
+                <div class="summary-value">4.80%</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-country">Guatemala</div>
+                <div class="summary-value">3.12%</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-country">Resto</div>
+                <div class="summary-value">9.71%</div>
+            </div>
+        </div>
+        <svg></svg>
+        <div class="footer">
+            Fuente: U.S Import and Export Merchandise trade statistics
+        </div>
+    </div>
+
+    <script>
+        // Datos
+        const data = [
+            { country: "México", value: 373738790, group: "high" },
+            { country: "Perú", value: 21776741, group: "low" },
+            { country: "Guatemala", value: 14147444, group: "low" },
+            { country: "Resto", value: 44061930, group: "low" }
+        ];
+
+        // Formatear valores
+        const formatMillions = d => d3.format(",")(Math.round(d / 1e3)) + " Tn";
+
+        // Escalar área proporcional
+        const maxArea = 80000;
+        const areaScale = d3.scaleLinear()
+            .domain([0, d3.max(data, d => d.value)])
+            .range([0, maxArea]);
+
+        const radiusFromArea = area => Math.sqrt(area / Math.PI);
+        const radiusScale = d3.scaleSqrt()
+            .domain([0, d3.max(data, d => d.value)])
+            .range([radiusFromArea(areaScale(0)), radiusFromArea(maxArea)]);
+
+        const svgWidth = 700;
+        const svgHeight = 500;
+
+        const svg = d3.select("svg")
+            .attr("width", svgWidth)
+            .attr("height", svgHeight);
+
+        // Fuerzas de gravedad para los grupos
+        const groupCenters = {
+            high: { x: svgWidth * 0.3, y: svgHeight * 0.45 },
+            low: { x: svgWidth * 0.7, y: svgHeight * 0.45 }
+        };
+
+        const simulation = d3.forceSimulation(data)
+            .force("x", d3.forceX(d => groupCenters[d.group].x).strength(0.2))
+            .force("y", d3.forceY(d => groupCenters[d.group].y).strength(0.2))
+            .force("collision", d3.forceCollide(d => radiusScale(d.value)))
+            .on("tick", ticked);
+
+        const bubbles = svg.selectAll("g")
+            .data(data)
+            .enter()
+            .append("g");
+
+        bubbles.append("image")
+            .attr("xlink:href", "graficas/mango.png") // Reemplaza por la ruta de tu archivo png
+            .attr("width", d => radiusScale(d.value) * 2)
+            .attr("height", d => radiusScale(d.value) * 2)
+            .attr("x", d => -radiusScale(d.value))
+            .attr("y", d => -radiusScale(d.value));
+
+        bubbles.each(function (d) {
+            const radius = radiusScale(d.value);
+            const labelWidth = 80;
+            const labelHeight = 40;
+
+            if (radius * 2 < labelWidth) {
+				d3.select(this)
+					.append("rect")
+                    .attr("class", "background")
+                    .attr("x", -labelWidth / 2)
+                    .attr("y", -radius - labelHeight - 5) // Encima del área
+                    .attr("width", labelWidth)
+                    .attr("height", labelHeight);
+                d3.select(this)
+                    .append("text")
+                    .attr("class", "label")
+                    .attr("x", 0)
+                    .attr("y", -radius - labelHeight / 2 - 8)
+                    .text(d.country);
+
+                d3.select(this)
+                    .append("text")
+                    .attr("class", "label value")
+                    .attr("x", 0)
+                    .attr("y", -radius - labelHeight / 2 + 10)
+                    .text(formatMillions(d.value));
+            } else {
+			
+				 d3.select(this)
+                    .append("rect")
+                    .attr("class", "background")
+                    .attr("x", -labelWidth / 2)
+                    .attr("y", -20)
+                    .attr("width", labelWidth)
+                    .attr("height", labelHeight);
+					
+                d3.select(this)
+                    .append("text")
+                    .attr("class", "label")
+//                    .attr("x", 0)
+                    .attr("y",  - 10)
+                    .text(d.country);
+
+                d3.select(this)
+                    .append("text")
+                    .attr("class", "label value")
+                    //.attr("x", 0)
+                    .attr("y",  10)
+                    .text(formatMillions(d.value));
+            }
+        });
+       function ticked() {
+            bubbles.attr("transform", d => `translate(${d.x}, ${d.y})`);
+        }
+    </script>
+</body>
+</html>
